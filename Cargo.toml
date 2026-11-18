@@ -1,0 +1,16 @@
+[package]
+name = "orderbook-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "A generic, exchange-agnostic limit order book"
+readme = "README.md"
+
+[dependencies]
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+all = "warn"
