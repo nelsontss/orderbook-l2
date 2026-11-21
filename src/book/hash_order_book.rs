@@ -1,6 +1,7 @@
 //! An experimental hash-map-backed book, built to be measured against
 //! [`OrderBook`](crate::OrderBook).
 
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -190,14 +191,14 @@ impl<P: Price + Hash, Q: Quantity> HashOrderBook<P, Q> {
     /// Iterates the bid side from the highest price down, sorting on each call.
     pub fn bids(&self) -> impl Iterator<Item = Level<P, Q>> + '_ {
         let mut levels = self.collect(Side::Bid);
-        levels.sort_unstable_by(|left, right| right.price.cmp(&left.price));
+        levels.sort_unstable_by_key(|level| Reverse(level.price));
         levels.into_iter()
     }
 
     /// Iterates the ask side from the lowest price up, sorting on each call.
     pub fn asks(&self) -> impl Iterator<Item = Level<P, Q>> + '_ {
         let mut levels = self.collect(Side::Ask);
-        levels.sort_unstable_by(|left, right| left.price.cmp(&right.price));
+        levels.sort_unstable_by_key(|level| level.price);
         levels.into_iter()
     }
 
