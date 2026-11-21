@@ -1,12 +1,38 @@
 [package]
-name = "orderbook-rs"
+name = "orderbook-l2"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.94"
-description = "A generic, exchange-agnostic limit order book"
+rust-version = "1.85"
+description = "A generic, exchange-agnostic L2 limit order book"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
+documentation = "https://docs.rs/orderbook-l2"
+repository = "https://github.com/nelsontss/orderbook-l2"
+keywords = ["orderbook", "trading", "market-data", "finance", "l2"]
+categories = ["finance", "data-structures"]
+exclude = ["AGENTS.md", ".github/*", "coverage/*"]
+
+[package.metadata.docs.rs]
+all-features = true
 
 [dependencies]
+
+[features]
+experimental-hashmap = []
+
+[dev-dependencies]
+criterion = "0.7"
+
+[lib]
+bench = false
+
+[[bench]]
+name = "book"
+harness = false
+
+[[bench]]
+name = "comparison"
+harness = false
 
 [lints.rust]
 unsafe_code = "forbid"
