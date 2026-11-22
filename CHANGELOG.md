@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] - unreleased
+## [0.1.1] - 2026-11-22
 
 ### Added
 
@@ -16,6 +16,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `Price` is implemented for every integer width, so `mid()` works on `i32`,
+  `u32`, `usize` and the rest without a newtype.
 - `mid()` is now the only method that requires `Price`. Everything else is
   bounded by `Copy + Ord + Sub`, so `OrderBook<usize, u64>`,
   `OrderBook<Decimal, Decimal>` and any other ordered, subtractable price type
