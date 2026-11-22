@@ -1,6 +1,9 @@
 # orderbook-l2
 
 [![CI](https://github.com/nelsontss/orderbook-l2/actions/workflows/ci.yml/badge.svg)](https://github.com/nelsontss/orderbook-l2/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/orderbook-l2.svg)](https://crates.io/crates/orderbook-l2)
+[![docs.rs](https://docs.rs/orderbook-l2/badge.svg)](https://docs.rs/orderbook-l2)
+[![license](https://img.shields.io/crates/l/orderbook-l2.svg)](#license)
 
 A generic, exchange-agnostic **L2 limit order book** in Rust.
 
