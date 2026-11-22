@@ -678,3 +678,210 @@ fn an_identical_ordered_stream_produces_an_identical_book() {
     assert_eq!(left_levels, right_levels);
     assert_eq!(left.depth(), (2, 2));
 }
+
+#[test]
+fn usize_prices_work() {
+    let mut book: OrderBook<usize, u64> = OrderBook::new();
+
+    book.post(Side::Bid, 100, 5).unwrap();
+    book.post(Side::Ask, 102, 3).unwrap();
+
+    assert_eq!(book.best_bid().map(|level| level.price), Some(100));
+    assert_eq!(book.best_ask().map(|level| level.price), Some(102));
+    assert_eq!(book.spread(), Some(2));
+    assert_eq!(book.depth(), (1, 1));
+
+    book.remove(Side::Bid, 100, 5).unwrap();
+
+    assert_eq!(book.depth(), (0, 1));
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct NoMidpoint(i64);
+
+impl std::ops::Sub for NoMidpoint {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self(self.0 - other.0)
+    }
+}
+
+#[test]
+fn every_operation_except_mid_works_without_price() {
+    let mut book: OrderBook<NoMidpoint, u64> = OrderBook::new();
+
+    book.post(Side::Bid, NoMidpoint(100), 5).unwrap();
+    book.post(Side::Ask, NoMidpoint(102), 3).unwrap();
+
+    assert_eq!(
+        book.best_bid(),
+        Some(Level {
+            price: NoMidpoint(100),
+            quantity: 5,
+        }),
+    );
+    assert_eq!(
+        book.best_ask(),
+        Some(Level {
+            price: NoMidpoint(102),
+            quantity: 3,
+        }),
+    );
+    assert_eq!(book.spread(), Some(NoMidpoint(2)));
+    assert_eq!(book.depth(), (1, 1));
+    assert_eq!(
+        book.level(Side::Bid, NoMidpoint(100))
+            .map(|level| level.quantity),
+        Some(5)
+    );
+    assert_eq!(book.bids().count(), 1);
+    assert_eq!(book.asks().count(), 1);
+    assert!(!book.is_crossed());
+
+    book.set_level(Side::Bid, NoMidpoint(100), 2).unwrap();
+    assert_eq!(
+        book.level(Side::Bid, NoMidpoint(100))
+            .map(|level| level.quantity),
+        Some(2)
+    );
+
+    book.remove(Side::Bid, NoMidpoint(100), 2).unwrap();
+    assert_eq!(book.depth(), (0, 1));
+
+    assert_eq!(
+        book.remove_level(Side::Ask, NoMidpoint(102))
+            .map(|level| level.quantity),
+        Some(3)
+    );
+    assert!(book.is_empty());
+}
+
+#[test]
+fn vec_book_accepts_usize_prices() {
+    use crate::book::VecOrderBook;
+
+    let mut book: VecOrderBook<usize, u64> = VecOrderBook::new();
+
+    book.post(Side::Bid, 100, 5).unwrap();
+    book.post(Side::Ask, 102, 3).unwrap();
+
+    assert_eq!(book.best_bid().map(|level| level.price), Some(100));
+    assert_eq!(book.spread(), Some(2));
+    assert_eq!(book.bids().count(), 1);
+}
+
+#[test]
+fn set_level_replaces_instead_of_accumulating() {
+    let mut book = populated(&[(Side::Bid, 100, 5)]);
+
+    book.set_level(Side::Bid, 100, 2).unwrap();
+    assert_eq!(quantity_at(&book, Side::Bid, 100), Some(2));
+
+    book.set_level(Side::Bid, 100, 7).unwrap();
+    assert_eq!(quantity_at(&book, Side::Bid, 100), Some(7));
+    assert_eq!(book.depth(), (1, 0));
+}
+
+#[test]
+fn set_level_creates_a_missing_level() {
+    let mut book = book();
+
+    book.set_level(Side::Ask, 101, 4).unwrap();
+
+    assert_eq!(
+        book.best_ask(),
+        Some(Level {
+            price: 101,
+            quantity: 4,
+        }),
+    );
+}
+
+#[test]
+fn set_level_zero_removes_the_level() {
+    let mut book = populated(&[(Side::Bid, 100, 5), (Side::Ask, 101, 2)]);
+
+    book.set_level(Side::Bid, 100, 0).unwrap();
+
+    assert_eq!(book.level(Side::Bid, 100), None);
+    assert_eq!(book.depth(), (0, 1));
+}
+
+#[test]
+fn set_level_rejects_negative_quantity() {
+    let mut book: OrderBook<i64, i64> = OrderBook::new();
+
+    assert_eq!(
+        book.set_level(Side::Bid, 100, -1),
+        Err(BookError::QuantityNotPositive),
+    );
+    assert!(book.is_empty());
+}
+
+#[test]
+fn vec_book_set_level_replaces_and_removes() {
+    use crate::book::VecOrderBook;
+
+    let mut book: VecOrderBook = VecOrderBook::new();
+
+    book.set_level(Side::Bid, 100, 5).unwrap();
+    book.set_level(Side::Bid, 100, 2).unwrap();
+
+    assert_eq!(book.best_bid().map(|level| level.quantity), Some(2));
+
+    book.set_level(Side::Bid, 100, 0).unwrap();
+
+    assert!(book.is_empty());
+}
+
+#[test]
+fn tick_book_set_level_replaces_and_removes() {
+    use crate::book::TickOrderBook;
+
+    let mut book: TickOrderBook = TickOrderBook::new(1_000, 1, 10).unwrap();
+
+    book.set_level(Side::Bid, 1_004, 7).unwrap();
+    assert_eq!(
+        book.best_bid(),
+        Some(Level {
+            price: 1_004,
+            quantity: 7,
+        }),
+    );
+
+    book.set_level(Side::Bid, 1_004, 2).unwrap();
+    assert_eq!(book.best_bid().map(|level| level.quantity), Some(2));
+
+    book.set_level(Side::Bid, 1_004, 0).unwrap();
+    assert!(book.is_empty());
+
+    assert_eq!(
+        book.set_level(Side::Bid, 2_000, 1),
+        Err(BookError::PriceOutsideGrid),
+    );
+}
+
+#[cfg(feature = "decimal")]
+#[test]
+fn decimal_prices_work() {
+    use rust_decimal::Decimal;
+
+    let bid = Decimal::new(10_025, 2);
+    let ask = Decimal::new(10_030, 2);
+
+    let mut book: OrderBook<Decimal, Decimal> = OrderBook::new();
+
+    book.post(Side::Bid, bid, Decimal::new(5, 0)).unwrap();
+    book.post(Side::Ask, ask, Decimal::new(3, 0)).unwrap();
+
+    assert_eq!(book.best_bid().map(|level| level.price), Some(bid));
+    assert_eq!(book.best_ask().map(|level| level.price), Some(ask));
+    assert_eq!(book.spread(), Some(Decimal::new(5, 2)));
+    assert_eq!(book.mid(), Some(Decimal::new(100_275, 3)));
+    assert_eq!(book.depth(), (1, 1));
+
+    book.remove(Side::Bid, bid, Decimal::new(5, 0)).unwrap();
+
+    assert_eq!(book.depth(), (0, 1));
+}

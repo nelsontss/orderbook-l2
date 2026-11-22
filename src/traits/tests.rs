@@ -98,3 +98,15 @@ fn midpoint_never_escapes_the_input_range() {
         }
     }
 }
+
+#[cfg(feature = "decimal")]
+#[test]
+fn decimal_midpoint_is_exact_and_symmetric() {
+    use rust_decimal::Decimal;
+
+    let low = Decimal::new(10_025, 2);
+    let high = Decimal::new(10_030, 2);
+
+    assert_eq!(low.mid(high), Decimal::new(100_275, 3));
+    assert_eq!(high.mid(low), low.mid(high));
+}

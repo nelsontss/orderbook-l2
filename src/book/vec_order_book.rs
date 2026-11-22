@@ -1,5 +1,7 @@
 //! A book stored as one sorted `Vec` per side.
 
+use std::ops::Sub;
+
 use crate::{BookError, Level, Price, Quantity, Side};
 
 /// A limit order book storing each side as a sorted `Vec`.
@@ -26,7 +28,7 @@ pub struct VecOrderBook<P = i64, Q = u64> {
     asks: Vec<Level<P, Q>>,
 }
 
-impl<P: Price, Q: Quantity> VecOrderBook<P, Q> {
+impl<P: Copy + Ord + Sub<Output = P>, Q: Quantity> VecOrderBook<P, Q> {
     /// Creates an empty book.
     #[must_use]
     pub fn new() -> Self {
@@ -117,6 +119,43 @@ impl<P: Price, Q: Quantity> VecOrderBook<P, Q> {
         Some(levels.remove(index))
     }
 
+    /// Replaces the level at `price` on `side` with `quantity`.
+    ///
+    /// A quantity of zero removes the level. This is the shape exchange feeds
+    /// publish when they carry absolute size rather than deltas, so a feed
+    /// handler does not have to pair `remove_level` with `post`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BookError::QuantityNotPositive`] when `quantity` is negative.
+    pub fn set_level(&mut self, side: Side, price: P, quantity: Q) -> Result<(), BookError> {
+        if quantity < Q::default() {
+            return Err(BookError::QuantityNotPositive);
+        }
+
+        let levels = match side {
+            Side::Bid => &mut self.bids,
+            Side::Ask => &mut self.asks,
+        };
+
+        match position(levels, side, price) {
+            Ok(index) => {
+                if quantity.is_zero() {
+                    levels.remove(index);
+                } else {
+                    levels[index].quantity = quantity;
+                }
+            }
+            Err(index) => {
+                if !quantity.is_zero() {
+                    levels.insert(index, Level { price, quantity });
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Returns the highest bid level, or `None` when the bid side is empty.
     #[must_use]
     pub fn best_bid(&self) -> Option<Level<P, Q>> {
@@ -136,15 +175,6 @@ impl<P: Price, Q: Quantity> VecOrderBook<P, Q> {
         let ask = self.best_ask()?;
 
         Some(ask.price - bid.price)
-    }
-
-    /// Returns the midpoint between the best bid and the best ask.
-    #[must_use]
-    pub fn mid(&self) -> Option<P> {
-        let bid = self.best_bid()?;
-        let ask = self.best_ask()?;
-
-        Some(bid.price.mid(ask.price))
     }
 
     /// Returns the level at `price` on `side`, or `None` when it does not exist.
@@ -192,13 +222,27 @@ impl<P: Price, Q: Quantity> VecOrderBook<P, Q> {
     }
 }
 
-impl<P: Price, Q: Quantity> Default for VecOrderBook<P, Q> {
+impl<P: Price, Q: Quantity> VecOrderBook<P, Q> {
+    /// Returns the midpoint between the best bid and the best ask.
+    ///
+    /// This is the only method that requires [`Price`]; every other operation
+    /// needs just `Copy + Ord + Sub`.
+    #[must_use]
+    pub fn mid(&self) -> Option<P> {
+        let bid = self.best_bid()?;
+        let ask = self.best_ask()?;
+
+        Some(bid.price.mid(ask.price))
+    }
+}
+
+impl<P: Copy + Ord + Sub<Output = P>, Q: Quantity> Default for VecOrderBook<P, Q> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-fn position<P: Price, Q>(levels: &[Level<P, Q>], side: Side, price: P) -> Result<usize, usize> {
+fn position<P: Ord, Q>(levels: &[Level<P, Q>], side: Side, price: P) -> Result<usize, usize> {
     match side {
         Side::Bid => levels.binary_search_by(|level| level.price.cmp(&price)),
         Side::Ask => levels.binary_search_by(|level| price.cmp(&level.price)),

@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::ops::Sub;
 
 use crate::{BookError, Level, Price, Quantity, Side};
 
@@ -57,7 +58,7 @@ pub struct OrderBook<P = i64, Q = u64> {
     asks: BTreeMap<P, Q>,
 }
 
-impl<P: Price, Q: Quantity> OrderBook<P, Q> {
+impl<P: Copy + Ord + Sub<Output = P>, Q: Quantity> OrderBook<P, Q> {
     /// Creates an empty book.
     ///
     /// # Examples
@@ -146,6 +147,33 @@ impl<P: Price, Q: Quantity> OrderBook<P, Q> {
         }
     }
 
+    /// Replaces the level at `price` on `side` with `quantity`.
+    ///
+    /// A quantity of zero removes the level. This is the shape exchange feeds
+    /// publish when they carry absolute size rather than deltas, so a feed
+    /// handler does not have to pair `remove_level` with `post`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BookError::QuantityNotPositive`] when `quantity` is negative.
+    pub fn set_level(&mut self, side: Side, price: P, quantity: Q) -> Result<(), BookError> {
+        if quantity < Q::default() {
+            return Err(BookError::QuantityNotPositive);
+        }
+
+        if quantity.is_zero() {
+            self.remove_level(side, price);
+            return Ok(());
+        }
+
+        match side {
+            Side::Bid => self.bids.insert(Reverse(price), quantity),
+            Side::Ask => self.asks.insert(price, quantity),
+        };
+
+        Ok(())
+    }
+
     /// Returns the highest bid level, or `None` when the bid side is empty.
     #[must_use]
     pub fn best_bid(&self) -> Option<Level<P, Q>> {
@@ -173,20 +201,6 @@ impl<P: Price, Q: Quantity> OrderBook<P, Q> {
         let ask = self.best_ask()?;
 
         Some(ask.price - bid.price)
-    }
-
-    /// Returns the midpoint between the best bid and the best ask, as computed
-    /// by [`Price::mid`].
-    ///
-    /// `None` unless both sides hold at least one level. Integer prices floor
-    /// when the two best prices sum to an odd number, so a `100`/`101` book has
-    /// a mid of `100`.
-    #[must_use]
-    pub fn mid(&self) -> Option<P> {
-        let bid = self.best_bid()?;
-        let ask = self.best_ask()?;
-
-        Some(bid.price.mid(ask.price))
     }
 
     /// Returns the level at `price` on `side`, or `None` when it does not exist.
@@ -301,7 +315,27 @@ fn decrement<K: Ord, Q: Quantity>(
     }
 }
 
-impl<P: Price, Q: Quantity> Default for OrderBook<P, Q> {
+impl<P: Price, Q: Quantity> OrderBook<P, Q> {
+    /// Returns the midpoint between the best bid and the best ask, as computed
+    /// by [`Price::mid`].
+    ///
+    /// `None` unless both sides hold at least one level. Integer prices floor
+    /// when the two best prices sum to an odd number, so a `100`/`101` book has
+    /// a mid of `100`.
+    ///
+    /// This is the only method that requires [`Price`]; every other operation
+    /// needs just `Copy + Ord + Sub`, so a price type without a midpoint still
+    /// gets the rest of the API.
+    #[must_use]
+    pub fn mid(&self) -> Option<P> {
+        let bid = self.best_bid()?;
+        let ask = self.best_ask()?;
+
+        Some(bid.price.mid(ask.price))
+    }
+}
+
+impl<P: Copy + Ord + Sub<Output = P>, Q: Quantity> Default for OrderBook<P, Q> {
     fn default() -> Self {
         Self::new()
     }

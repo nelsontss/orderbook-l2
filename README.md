@@ -63,6 +63,7 @@ Every book exposes the same surface.
 | `post(side, price, quantity)` | `Result<(), BookError>` |
 | `remove(side, price, quantity)` | `Result<(), BookError>` |
 | `remove_level(side, price)` | `Option<Level>` |
+| `set_level(side, price, quantity)` | `Result<(), BookError>` — replaces, removes on zero |
 | `clear()` | — |
 | `best_bid()` / `best_ask()` | `Option<Level>` |
 | `spread()` | `Option<P>` |
@@ -235,9 +236,13 @@ for (price, delta) in updates {
 
 ## Custom numeric types
 
-`Price` needs ordering, subtraction and a midpoint; `Quantity` is blanket
-implemented for anything that is `Copy + Ord + Default` with `Add` and `Sub`.
-Fixed-point and decimal crates satisfy the second without any work.
+`Quantity` is blanket-implemented for anything that is `Copy + Ord + Default`
+with `Add` and `Sub`, so fixed-point and decimal crates satisfy it with no work.
+
+`Price` adds one thing on top of `Copy + Ord + Sub`: a midpoint. Only `mid()`
+requires it. Every other operation — post, remove, best bid and ask, spread,
+depth, iteration — is bounded by `Copy + Ord + Sub` alone, so a price type with
+no meaningful midpoint still gets the whole API minus `mid()`.
 
 ```rust
 use orderbook_l2::Price;
@@ -258,6 +263,32 @@ impl Price for Ticks {
     }
 }
 ```
+
+### Decimals
+
+`rust_decimal::Decimal` is `Copy + Ord + Default` with `Add` and `Sub`, so it
+works as a quantity immediately and as a price for everything except `mid()`.
+To get `mid()` too, enable the `decimal` feature:
+
+```toml
+orderbook-l2 = { version = "0.1", features = ["decimal"] }
+```
+
+```rust
+use orderbook_l2::{OrderBook, Side};
+use rust_decimal::Decimal;
+
+let mut book: OrderBook<Decimal, Decimal> = OrderBook::new();
+book.post(Side::Bid, Decimal::new(10_025, 2), Decimal::new(5, 0)).unwrap();
+book.post(Side::Ask, Decimal::new(10_030, 2), Decimal::new(3, 0)).unwrap();
+
+assert_eq!(book.mid(), Some(Decimal::new(100_275, 3)));
+```
+
+The feature is off by default and pulls only `rust_decimal` and its arithmetic
+dependencies.
+
+### Floats
 
 `f64` is deliberately not supported: it is `PartialOrd`, not `Ord`, and a
 NaN-descending price ladder is not something worth debugging.

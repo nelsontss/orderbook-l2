@@ -1,6 +1,6 @@
 [package]
 name = "orderbook-l2"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 description = "A generic, exchange-agnostic L2 limit order book"
@@ -16,8 +16,10 @@ exclude = ["AGENTS.md", ".github/*", "coverage/*"]
 all-features = true
 
 [dependencies]
+rust_decimal = { version = "1", optional = true, default-features = false, features = ["std"] }
 
 [features]
+decimal = ["dep:rust_decimal"]
 experimental-hashmap = []
 
 [dev-dependencies]

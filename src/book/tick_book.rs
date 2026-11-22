@@ -195,6 +195,30 @@ impl<Q: Quantity> TickOrderBook<Q> {
         Some(current)
     }
 
+    /// Replaces the level at `price` on `side` with `quantity`.
+    ///
+    /// A quantity of zero removes the level. This is the shape exchange feeds
+    /// publish when they carry absolute size rather than deltas.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BookError::QuantityNotPositive`] when `quantity` is negative,
+    /// and [`BookError::PriceOutsideGrid`] when `price` is not an exact tick
+    /// inside the grid.
+    pub fn set_level(&mut self, side: Side, price: i64, quantity: Q) -> Result<(), BookError> {
+        if quantity < Q::default() {
+            return Err(BookError::QuantityNotPositive);
+        }
+
+        let index = self
+            .grid
+            .index_of(price)
+            .ok_or(BookError::PriceOutsideGrid)?;
+        self.slots_mut(side).store(index, quantity);
+
+        Ok(())
+    }
+
     /// Returns the highest bid level, or `None` when the bid side is empty.
     #[must_use]
     pub fn best_bid(&self) -> Option<Level<i64, Q>> {

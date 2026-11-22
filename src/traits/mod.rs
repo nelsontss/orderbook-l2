@@ -38,6 +38,11 @@ impl<T> Quantity for T where T: Copy + Ord + Default + Add<Output = T> + Sub<Out
 
 /// A price the book can order, subtract, and halve.
 ///
+/// Only [`OrderBook::mid`](crate::OrderBook::mid) requires this trait. Every
+/// other operation is bounded by `Copy + Ord + Sub`, so a price type with no
+/// midpoint still gets the whole API except `mid`, and types from third-party
+/// crates need only the [`Sub`] impl they already have.
+///
 /// Deliberately not implemented for `f64`: [`Ord`] is required, and `NaN` has no
 /// place in a price ladder. Implement this trait for a fixed-point or decimal
 /// newtype instead; the only method to supply is [`Price::mid`].
@@ -64,6 +69,19 @@ pub trait Price: Copy + Ord + Sub<Output = Self> {
     /// ```
     #[must_use]
     fn mid(self, other: Self) -> Self;
+}
+
+#[cfg(feature = "decimal")]
+impl Price for rust_decimal::Decimal {
+    fn mid(self, other: Self) -> Self {
+        let (low, high) = if self <= other {
+            (self, other)
+        } else {
+            (other, self)
+        };
+
+        low + (high - low) / rust_decimal::Decimal::TWO
+    }
 }
 
 macro_rules! impl_price {

@@ -4,7 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - unreleased
+
+### Added
+
+- `set_level(side, price, quantity)` on all three books: replaces a level, and
+  removes it when the quantity is zero, for feeds that publish absolute size
+  rather than deltas.
+- `decimal` feature: implements `Price` for `rust_decimal::Decimal`, so `mid()`
+  is available on decimal books. Optional and off by default.
+
+### Changed
+
+- `mid()` is now the only method that requires `Price`. Everything else is
+  bounded by `Copy + Ord + Sub`, so `OrderBook<usize, u64>`,
+  `OrderBook<Decimal, Decimal>` and any other ordered, subtractable price type
+  work without a newtype or an extra impl.
+
+## [0.1.0] - 2026-11-22
 
 ### Added
 
