@@ -110,3 +110,29 @@ fn decimal_midpoint_is_exact_and_symmetric() {
     assert_eq!(low.mid(high), Decimal::new(100_275, 3));
     assert_eq!(high.mid(low), low.mid(high));
 }
+
+#[test]
+fn every_integer_width_has_a_midpoint() {
+    assert_eq!(100_i8.mid(101), 100);
+    assert_eq!(100_i16.mid(101), 100);
+    assert_eq!(100_i32.mid(101), 100);
+    assert_eq!(100_i64.mid(101), 100);
+    assert_eq!(100_i128.mid(101), 100);
+    assert_eq!(100_isize.mid(101), 100);
+    assert_eq!(100_u8.mid(101), 100);
+    assert_eq!(100_u16.mid(101), 100);
+    assert_eq!(100_u32.mid(101), 100);
+    assert_eq!(100_u64.mid(101), 100);
+    assert_eq!(100_u128.mid(101), 100);
+    assert_eq!(100_usize.mid(101), 100);
+}
+
+#[test]
+fn narrow_types_do_not_overflow_at_their_extremes() {
+    assert_eq!(i8::MIN.mid(i8::MAX), -1);
+    assert_eq!(u8::MIN.mid(u8::MAX), u8::MAX / 2);
+    assert_eq!(i32::MIN.mid(i32::MAX), -1);
+    assert_eq!(u32::MIN.mid(u32::MAX), u32::MAX / 2);
+    assert_eq!(isize::MIN.mid(isize::MAX), -1);
+    assert_eq!(usize::MIN.mid(usize::MAX), usize::MAX / 2);
+}
